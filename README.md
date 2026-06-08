@@ -91,7 +91,7 @@ Evaluates the proportion of long-haul widebody arrivals. Long-haul flights gener
 └── tests/                   # Automated structural test validation suites
     ├── test_agent.py
     └── test_tools.py   
-
+```
 
 ##  Step-by-Step Installation
 
@@ -107,7 +107,7 @@ it clone <repository-url>
 cd RAG_PROJECT
 ```
 
-### 3. Set Up a Virtual Environment
+### 2. Set Up a Virtual Environment
 
 **CRITICAL FOR macOS USERS:** you may need **Python 3.10 or higher**. Before creating the environment, verify your active terminal environment version:
 ```sh
@@ -147,7 +147,7 @@ venv\Scripts\Activate.ps1
 
 ---
 
-### 4. Install Required Packages
+### 3. Install Required Packages
 
 - Now, install the tool's building blocks (libraries that read PDFs, connect to databases, etc.) by running this command:
 ```sh
@@ -162,7 +162,7 @@ pip install -r requirements.txt
 
 ---
 
-### 5. Configure Environment Variables
+### 4. Configure Environment Variables
 
 The pipeline loads credentials from a local `.env` file (ignored by Git). Because your API keys are secret, we don't put them in the public code. We put them in a hidden file called .env.
 
@@ -202,7 +202,7 @@ OPENAI_API_KEY=your_actual_openai_api_key_here
 AIRLABS_API_KEY=your_actual_airlabs_api_key_here
 ```
 
-### 6. Launch the Private Equity Dashboard
+### 5. Launch the Private Equity Dashboard
 
 You are ready!
 
@@ -214,7 +214,7 @@ streamlit run app.py
 
 The interface will automatically compile its assets and launch within a local browser window at http://localhost:8501. 
 
-### 7. Execute the Automated Test Suite
+### 6. Execute the Automated Test Suite
 
 To verify the math pipeline, dynamic inference guards, and security boundaries natively:
 
