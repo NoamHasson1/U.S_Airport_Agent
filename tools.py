@@ -3,14 +3,13 @@ import json
 import os
 import random
 import requests
-import time
 import streamlit as st
 from dotenv import load_dotenv
 
 # Load environment variables from .env
 load_dotenv()
 
-# --- DYNAMIC CONFIGURATION LOADER ---
+# --- CONFIGURATION LOADER ---
 CONFIG_FILE = "airport_config.json"
 AIRPORT_PROFILES = {}
 
@@ -24,7 +23,7 @@ except json.JSONDecodeError:
     print(f"      [System Error]: '{CONFIG_FILE}' contains malformed JSON. Fallback to dynamic inference initiated.")
 
 
-@st.cache_data(ttl=600)  # <-- Cache API results for 10 minutes to save credits and speed up responses
+@st.cache_data(ttl=600)  # Cache API results for 10 minutes to save credits and speed up responses
 def fetch_live_flights_from_api(airport_code: str) -> int:
     """
     Calls the commercial AirLabs API to get real-time flight schedules.
@@ -48,7 +47,6 @@ def fetch_live_flights_from_api(airport_code: str) -> int:
             data = response.json()
             flights_list = data.get("response")
             
-            # Defensive Check: Ensure the response is actually a valid list structure
             if not isinstance(flights_list, list):
                 print("      [AirLabs API Warning]: Response payload 'response' key is not a list.")
                 return None
@@ -69,17 +67,32 @@ def fetch_live_flights_from_api(airport_code: str) -> int:
 
 def generate_deterministic_airport_data(airport_code: str) -> dict:
     """
-    Generates consistent infrastructure data for ANY US airport using a hybrid
-    External Profile Configuration, Dynamic Inference, and Sanity-Checked Data pipeline.
+    Generates consistent infrastructure data for US airports using an
+    External Profile Configuration and Dynamic AirLabs live validation.
+    Blocks unlisted assets that return no live traffic to protect data integrity.
     """
     airport_code = airport_code.upper().strip()
     
+    # Ingest dynamic real-time traffic parameter
+    live_flights = fetch_live_flights_from_api(airport_code)
+    
+    # --- INPUT ACCURACY GUARD ---
+    # If the asset is missing from local registry AND the API returns zero/unreliable traffic
+    if (live_flights is None or live_flights <= 15) and (airport_code not in AIRPORT_PROFILES):
+        print(f"      [🚫 Invalid Input]: '{airport_code}' not found in JSON registry and returned no live API traffic.")
+        
+        # Trigger UI status light to Red
+        st.session_state.api_healthy = False
+        
+        return {
+            "airport_code": airport_code,
+            "status": "invalid_airport_code",
+            "error": f"The airport code '{airport_code}' is not a recognized major US airport or is outside our asset mandate."
+        }
+
     # Generate static local seed for consistent fallbacks and bounding limits
     seed_number = int(hashlib.md5(airport_code.encode('utf-8')).hexdigest(), 16) % 1000000
     rng = random.Random(seed_number)
-    
-    # Ingest dynamic real-time traffic parameter
-    live_flights = fetch_live_flights_from_api(airport_code)
     
     # --- PHASE 1: TIER & CAPACITY DETERMINATION ---
     if airport_code in AIRPORT_PROFILES:
@@ -90,7 +103,6 @@ def generate_deterministic_airport_data(airport_code: str) -> dict:
         
         # OPERATIONAL SANITY CHECK: Detect off-peak anomalies or empty API responses
         if live_flights is not None:
-            # If a Mega Hub returns less than 150 flights, it's a data outlier (e.g., midnight run)
             if tier == "Mega Hub" and live_flights < 150:
                 print(f"      [Sanity Check]: Live flight count ({live_flights}) unreasonably low for a Mega Hub. Forcing fallback layer...")
                 live_flights = None
@@ -100,51 +112,30 @@ def generate_deterministic_airport_data(airport_code: str) -> dict:
 
         # Stable seed-based fallback if API is dead OR if the sanity check failed
         if live_flights is None:
+            print(f"      [🔌 Failover Activated]: AirLabs down for verified asset {airport_code}. Running deterministic fallback model...")
+            st.session_state.api_healthy = False  # Switch sidebar indicator to red
+            
             if tier == "Mega Hub":
                 live_flights = max_capacity + rng.randint(-100, 100)
             else:
                 live_flights = max_capacity + rng.randint(-50, 50)
     
-    # DYNAMIC INFERENCE LAYER: For airports outside the JSON registry
+    # DYNAMIC INFERENCE LAYER: For REAL airports outside the JSON registry (verified via live traffic)
     else:
-        print(f"      [Inference Engine]: Airport '{airport_code}' not found in JSON config. Deriving profile dynamically...")
+        print(f"      [Inference Engine]: Airport '{airport_code}' verified via live API. Deriving investment profile dynamically...")
         
-        if live_flights is not None and live_flights >= 50:  # Require at least 50 flights for dynamic classification
-            if live_flights >= 850:
-                tier = "Mega Hub"
-                max_capacity = rng.randint(900, 1100)
-                long_haul_bounds = (8.0, 15.0)
-            elif 400 <= live_flights < 850:
-                tier = "Large Regional"
-                max_capacity = rng.randint(550, 750)
-                long_haul_bounds = (6.0, 14.0)
-            else:
-                tier = "Medium/Small Regional"
-                max_capacity = rng.randint(180, 320)
-                long_haul_bounds = (3.0, 8.0)
+        if live_flights >= 850:
+            tier = "Mega Hub"
+            max_capacity = rng.randint(900, 1100)
+            long_haul_bounds = (8.0, 15.0)
+        elif 400 <= live_flights < 850:
+            tier = "Large Regional"
+            max_capacity = rng.randint(550, 750)
+            long_haul_bounds = (6.0, 14.0)
         else:
-            # Fallback extrapolation if API is completely dead or flight count is too low to infer anything safely
-            if live_flights is not None:
-                print(f"      [Sanity Check]: Live count ({live_flights}) too low for reliable classification. Extrapolating...")
-            else:
-                print("      [Inference Warning]: API offline for unlisted asset. Extrapolating via hash seeds...")
-                
-            tier_selector = rng.randint(1, 3)
-            if tier_selector == 1:
-                tier = "Mega Hub"
-                max_capacity = rng.randint(900, 1100)
-                live_flights = rng.randint(850, 1200)
-                long_haul_bounds = (8.0, 15.0)
-            elif tier_selector == 2:
-                tier = "Large Regional"
-                max_capacity = rng.randint(550, 750)
-                live_flights = rng.randint(450, 720)
-                long_haul_bounds = (6.0, 14.0)
-            else:
-                tier = "Medium/Small Regional"
-                max_capacity = rng.randint(180, 320)
-                live_flights = rng.randint(120, 290)
-                long_haul_bounds = (3.0, 8.0)
+            tier = "Medium/Small Regional"
+            max_capacity = rng.randint(180, 320)
+            long_haul_bounds = (3.0, 8.0)
 
     # --- PHASE 2: METRICS MATHEMATICAL NORMALIZATION ---
     long_haul_pct = round(rng.uniform(long_haul_bounds[0], long_haul_bounds[1]), 1)
@@ -175,6 +166,7 @@ def generate_deterministic_airport_data(airport_code: str) -> dict:
         "unmet_demand_reason": unmet_reason,
         "investment_score": investment_score
     }
+
 
 def get_airport_metrics(airport_code: str) -> dict:
     return generate_deterministic_airport_data(airport_code)

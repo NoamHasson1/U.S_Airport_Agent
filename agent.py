@@ -1,4 +1,5 @@
 import json
+import streamlit as st 
 from openai import OpenAI
 from tools import get_airport_metrics
 from dotenv import load_dotenv
@@ -56,6 +57,9 @@ def run_investment_agent(user_message: str, chat_history: list = None) -> tuple:
     Executes the conversational agent loop with persistent state tracking and parallel tool auditing.
     Returns: (str: response_text, list: updated_chat_history)
     """
+    # Initialize API health state if not already set
+    st.session_state.api_healthy = True
+
     if chat_history is None:
         chat_history = []
         
@@ -88,7 +92,7 @@ def run_investment_agent(user_message: str, chat_history: list = None) -> tuple:
     
     # Step 2: Orchestrate Parallel Tool Execution Loop if requested
     if tool_calls:
-        print(f"\n[🛠️ Tool Call Detected]: {MODEL_NAME} requested {len(tool_calls)} parallel function execution(s).")
+        print(f"\n[Tool Call Detected]: {MODEL_NAME} requested {len(tool_calls)} parallel function execution(s).")
         
         for tool_call in tool_calls:
             function_name = tool_call.function.name
@@ -103,6 +107,8 @@ def run_investment_agent(user_message: str, chat_history: list = None) -> tuple:
                     tool_output = get_airport_metrics(airport_code)
                     print(f"  └── Tool Returned Payload: Score={tool_output.get('investment_score')}, Congestion={tool_output.get('congestion_rate')}, Unmet Demand={tool_output.get('unmet_demand_pct')}%")
                 except Exception as tool_exc:
+                    st.session_state.api_healthy = False
+                    
                     # Create a graceful fallback payload so the LLM knows the tool failed instead of crashing the UI
                     print(f"  [Tool Error]: Function execution failed for {airport_code}. Details: {str(tool_exc)}")
                     tool_output = {
