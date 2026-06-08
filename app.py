@@ -1,5 +1,11 @@
+import io
 import streamlit as st
 from agent import run_investment_agent
+from streamlit_mic_recorder import mic_recorder
+from openai import OpenAI
+
+# Initialize OpenAI Client for Whisper
+openai_client = OpenAI()
 
 # 1. Page Configuration
 st.set_page_config(
@@ -9,11 +15,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Initialize Session State Variables (Preventing racing conditions in Sidebar)
+# 2. Initialize Session State Variables (Preventing racing conditions)
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "api_healthy" not in st.session_state:
     st.session_state.api_healthy = True
+if "last_processed_audio" not in st.session_state:
+    st.session_state.last_processed_audio = None
 
 # 3. Premium CSS Injection (Gradient text, absolute avatar removal, pulse animation & Tech Background)
 st.markdown("""
@@ -118,15 +126,65 @@ st.markdown("""
     }
     tr:nth-child(even) td { background-color: #1e293b !important; }
     h3 { color: #38bdf8 !important; margin-top: 25px !important; border-bottom: 1px solid #334155; padding-bottom: 8px; }
+    
+    /* 🛠️ PREMIUM MIC & COLUMN ALIGNMENT FOR GEMINI LOOK */
+    
+    /* ניקוי מוחלט של קופסת המיקרופון והתאמת גודל קומפקטית */
+    div[data-testid="element-container"]:has(iframe) {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: auto !important;
+    }
+    div[data-testid="element-container"] iframe {
+        border-radius: 50% !important;
+        height: 40px !important;
+        width: 40px !important;
+        margin-left: 12px !important;  /* הזזה קלה ימינה לתוך שולי הבר */
+        padding-top: 2px !important;   /* איזון אנכי מדויק */
+    }
+    
+    /* הפיכת הבלוק המשותף לקפסולת פרימיום ממורכזת בתחתית */
+    div[data-testid="stHorizontalBlock"] {
+        position: fixed !important;
+        bottom: 24px !important;
+        max-width: 840px !important;   /* רוחב זהה לחלוטין לבר של Gemini */
+        width: 100% !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        background: #111827 !important; /* צבע רקע כהה ונקי המתמזג עם תיבת הטקסט */
+        padding: 6px 12px !important;
+        border-radius: 35px !important; /* קצוות עגולים לחלוטין */
+        border: 1px solid #1e293b !important;
+        z-index: 999999 !important;
+        display: flex !important;
+        align-items: center !important; /* יישור אנכי מושלם של המיקרופון והטקסט */
+    }
+
+    /* העלמת שכבות הרקע והגבולות המקוריות של תיבת הטקסט של סטרימליט */
+    div[data-testid="stChatInput"] {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+    div[data-testid="stChatInput"] fieldset {
+        border: none !important;
+    }
+    div[data-testid="stChatInput"] textarea {
+        background: transparent !important;
+        color: #f8fafc !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. Render Centered Corporate Header
+# 4. Render Centered Corporate Header
 st.markdown('<div class="centered-title">Airport Investment Intelligence Agent</div>', unsafe_allow_html=True)
 st.markdown('<div class="centered-caption">Identify and analyze US airport modernization & expansion opportunities.</div>', unsafe_allow_html=True)
 st.markdown("---")
 
-# 4. SIDEBAR: WORKSPACE CONFIGURATION
+# 5. SIDEBAR: WORKSPACE CONFIGURATION
 with st.sidebar:
     st.title("Workspace Configuration")
     st.markdown("**Role & Purpose:**\nThis panel manages global environment parameters and active database connection states.")
@@ -137,12 +195,12 @@ with st.sidebar:
     if st.button("Clear Conversation & Context", use_container_width=True):
         st.session_state.messages = []
         st.session_state.api_healthy = True  # Hard reset back to healthy state
+        st.session_state.last_processed_audio = None
         st.rerun()
         
     st.markdown("---")
     st.subheader("Operational Pipeline Status")
     
-    # 🚨 DYNAMIC LAYER: Render green or red indicator based on backend pipeline memory state
     if st.session_state.api_healthy:
         st.markdown(
             '<div class="pulse-container"><div class="pulse-dot"></div>'
@@ -156,22 +214,65 @@ with st.sidebar:
             unsafe_allow_html=True
         )
 
-# 5. Display Active Chat History
+# 6. Display Active Chat History
+st.markdown('<div style="margin-bottom: 100px;">', unsafe_allow_html=True)
 for message in st.session_state.messages:
     if message.get("role") in ["user", "assistant"] and message.get("content"):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
+st.markdown('</div>', unsafe_allow_html=True)
 
-# 6. Bottom Chat Interface Loop
-if user_input := st.chat_input("Ask me about airport investments..."):
+# 7. Unified Input Pipeline (Voice + Text Inside a Single Premium Pill Bar)
+user_query = None
+
+# יצירת שורה משותפת ממורכזת: המיקרופון משמאל ותיבת הטקסט מימין
+input_col1, input_col2 = st.columns([1, 14])  # הגדלנו מעט את יחס העמודה של הטקסט למראה מאוזן יותר
+
+with input_col1:
+    audio_box = mic_recorder(
+        start_prompt="🎤",
+        stop_prompt="🛑",
+        key="voice_chat",
+        just_once=True
+    )
+
+with input_col2:
+    chat_query = st.chat_input("Ask me about airport investments...")
+    if chat_query:
+        user_query = chat_query
+
+# Intercept and process incoming binary audio array streams
+if audio_box and 'bytes' in audio_box:
+    audio_bytes = audio_box['bytes']
+    
+    if st.session_state.last_processed_audio != audio_bytes:
+        st.session_state.last_processed_audio = audio_bytes
+        
+        with st.spinner("🎧 Transcribing voice prompt via OpenAI Whisper..."):
+            try:
+                audio_file = io.BytesIO(audio_bytes)
+                audio_file.name = "audio.wav"
+                
+                transcript = openai_client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file
+                )
+                
+                if transcript.text.strip():
+                    user_query = transcript.text
+            except Exception as e:
+                st.error(f"Voice Transcription Pipeline Interrupted: {str(e)}")
+
+# 8. Execution and Agent Runtime Core Loop
+if user_query:
     with st.chat_message("user"):
-        st.markdown(user_input)
+        st.markdown(user_query)
     
     with st.chat_message("assistant"):
         with st.spinner("Analyzing aviation data and infrastructure models..."):
-            response_text, updated_history = run_investment_agent(user_input, chat_history=st.session_state.messages)
+            response_text, updated_history = run_investment_agent(user_query, chat_history=st.session_state.messages)
             st.markdown(response_text)
             
     # Synchronize persistent session state history
     st.session_state.messages = updated_history
-    st.rerun()  # Triggers an immediate refresh to sync the sidebar state if it changed
+    st.rerun()
