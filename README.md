@@ -52,6 +52,7 @@ $$\text{Investment Score} = \text{Congestion Component (40\%)} + \text{Unmet Dem
 
 ### 1. Congestion Component (Weight: 40% | Max: 40 Points)
 Measures capital saturation by dividing live daily flight arrivals against the terminal's designed maximum structural capacity. Higher values indicate an asset operating near or above its threshold, signaling a pressing demand for infrastructure expansion.
+
 $$\text{Congestion Ratio} = \frac{\text{Live Daily Arrivals}}{\text{Max Structural Capacity}}$$
 
 ### 2. Unmet Demand Component (Weight: 40% | Max: 40 Points)
