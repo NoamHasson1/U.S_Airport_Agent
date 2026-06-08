@@ -35,7 +35,7 @@ def fetch_live_flights_from_api(airport_code: str) -> int:
         return None
         
     airport_code = airport_code.upper().strip()
-    url = f"https://airlabs.co/api/v9/schedules?api_key={api_key}&arr_iata={airport_code}"
+    url = f"https://airlabs.co/api/v9/schedules?api_key={api_key}&arr_iata={airport_code}&limit=1000"
     
     print(f"      [AirLabs API]: Fetching live arrivals for {airport_code} (Cache Miss)...")
     
@@ -79,7 +79,7 @@ def generate_deterministic_airport_data(airport_code: str) -> dict:
     # --- INPUT ACCURACY GUARD ---
     # If the asset is missing from local registry AND the API returns zero/unreliable traffic
     if (live_flights is None or live_flights <= 15) and (airport_code not in AIRPORT_PROFILES):
-        print(f"      [🚫 Invalid Input]: '{airport_code}' not found in JSON registry and returned no live API traffic.")
+        print(f"      [Invalid Input]: '{airport_code}' not found in JSON registry and returned no live API traffic.")
         
         # Trigger UI status light to Red
         st.session_state.api_healthy = False
@@ -100,6 +100,20 @@ def generate_deterministic_airport_data(airport_code: str) -> dict:
         tier = profile["tier"]
         max_capacity = profile["base_capacity"] + rng.randint(-30, 30)
         long_haul_bounds = profile["long_haul_range"]
+
+        # FREE-TIER API TRUNCATION MITIGATION LAYER
+        # If live_flights is exactly 400, the Free-Tier API capped us at 100 records.
+        # We extrapolate a highly realistic dynamic volume scaled to the airport's true structural tier.
+        if live_flights == 400:
+            print(f"      [API Guard]: Detected Free-Tier 100-record truncation for {airport_code}. Scaling volume realistically...")
+            if tier == "Mega Hub":
+                # Mega Hubs realistically operate at near-capacity or over-capacity (88% to 112% utilization)
+                live_flights = int(max_capacity * rng.uniform(0.88, 1.12))
+            elif tier == "Large Regional":
+                # Large Regionals dynamically scale between 65% and 90% utilization
+                live_flights = int(max_capacity * rng.uniform(0.65, 0.90))
+            else:
+                live_flights = int(max_capacity * rng.uniform(0.50, 0.80))
         
         # OPERATIONAL SANITY CHECK: Detect off-peak anomalies or empty API responses
         if live_flights is not None:

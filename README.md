@@ -101,10 +101,10 @@ Evaluates the proportion of long-haul widebody arrivals. Long-haul flights gener
 ```sh
 # 1. Download the code from GitHub to your computer
 
-it clone <repository-url>
+git clone <repository-url>
 
 # 2. Move your terminal focus inside the project folder
-cd RAG_PROJECT
+cd <project_name>
 ```
 
 ### 2. Set Up a Virtual Environment
@@ -149,7 +149,7 @@ venv\Scripts\Activate.ps1
 
 ### 3. Install Required Packages
 
-- Now, install the tool's building blocks (libraries that read PDFs, connect to databases, etc.) by running this command:
+- Now, install the tool's building blocks (llibraries that parse JSON configuration, handle HTTP network requests, and manage the live UI framework) by running this command:
 ```sh
 pip install -r requirements.txt
 ```
