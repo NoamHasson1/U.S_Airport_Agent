@@ -80,15 +80,15 @@ Evaluates the proportion of long-haul widebody arrivals. Long-haul flights gener
 ## Project Structure
 
 ```text
-├── .env.example             # Documented template for system environment variables
-├── .gitignore               # System, OS, Python cache, and secret exclusion matrix
-├── app.py                   # Streamlit UI presentation and layout orchestration layer
-├── agent.py                 # OpenAI agent routing, parallel tool mapping, and state serialization
-├── tools.py                 # Core analytical calculations, API clients, and MD5 fallback loops
-├── prompts.py               # Enterprise System Prompts, risk boundaries, and analyst persona rules
-├── airport_config.json      # Structured baseline asset profiles for top-tier US hubs
-├── requirements.txt         # Pinned operational Python package dependencies
-└── tests/                   # Automated structural test validation suites
+├── .env.example
+├── .gitignore
+├── app.py
+├── agent.py
+├── tools.py
+├── prompts.py
+├── airport_config.json
+├── requirements.txt
+└── tests/
     ├── test_agent.py
     └── test_tools.py   
 ```
