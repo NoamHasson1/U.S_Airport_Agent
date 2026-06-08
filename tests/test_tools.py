@@ -28,15 +28,16 @@ def test_deterministic_registry_airport():
 
 def test_dynamic_inference_for_unlisted_airport():
     """
-    Test 2: Ensures that an airport NOT listed in the JSON config (e.g., XYZ)
-    is handled gracefully by the Inference Engine without crashing the system.
+    Test 2: Ensures that a completely fictional airport code (e.g., XYZ)
+    is caught by the Input Accuracy Guard and rejected rather than 
+    generating misleading fictional profiles.
     """
     data = generate_deterministic_airport_data("XYZ")
     
     assert data["airport_code"] == "XYZ"
-    assert "tier" in data
-    assert 0 <= data["investment_score"] <= 100
-    assert isinstance(data["unmet_demand_reason"], str)
+    assert data["status"] == "invalid_airport_code"
+    assert "error" in data
+    assert "tier" not in data 
 
 
 @patch('tools.requests.get')
