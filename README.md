@@ -8,7 +8,8 @@ An advanced, AI-powered conversational agent and decision-support dashboard desi
   - **Python Version:** Python `3.10` or higher is strictly recommended.
   - **External Access:** Active internet connection to connect to public API endpoints.
   - **Required Secrets:** * A valid **OpenAI API Key**.
-   **Required Secrets:** * A valid **AirLabs API Key**.
+  - **Required Secrets:** * A valid **AirLabs API Key**.
+  - **Order:** Make sure you initialize and register your 2 keys before starting the app.
 
 
 ## Project Overview
